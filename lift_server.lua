@@ -3,7 +3,7 @@
 local CONFIG = {
     modemSide = "back",
     liftSide = "bottom",
-    redstoneSide = "back",
+    redstoneSide = "left",
     channel = 4817,
     protocol = "lift_control_v1",
     callPulseSeconds = 0.2,
