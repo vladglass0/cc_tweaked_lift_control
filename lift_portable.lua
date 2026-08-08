@@ -122,22 +122,26 @@ local function handleKey(key)
 end
 
 local ok, err = pcall(function()
-    modem = peripheral.find("modem", function(_, wrapped)
-        return wrapped and wrapped.transmit and wrapped.open
-    end)
-    if not modem then
-        error("Беспроводной модем не найден. Установите modem на компьютер.", 0)
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("Lift client starting...")
+
+    modem = peripheral.find("modem")
+    if not modem or not modem.transmit or not modem.open then
+        error("Wireless modem not found. Attach a wireless modem to the computer.", 0)
     end
     modem.open(CONFIG.channel)
     draw()
     requestState()
     timer = os.startTimer(CONFIG.refreshSeconds)
     while running do
-        local event, a, b, c, raw = os.pullEvent()
+        local event, a, b, c, d = os.pullEvent()
         if event == "key" then
             handleKey(a)
-        elseif event == "modem_message" and b == CONFIG.channel and type(raw) == "string" then
-            local parsed, message = pcall(textutils.unserialize, raw)
+        elseif event == "modem_message" and b == CONFIG.channel and type(d) == "string" then
+            local parsed, message = pcall(textutils.unserialize, d)
             if parsed and type(message) == "table" and message.type == "state" then
                 state = message
                 if selected > #(state.floors or {}) then selected = math.max(1, #(state.floors or {})) end
@@ -150,12 +154,21 @@ local ok, err = pcall(function()
     end
 end)
 
-term.setBackgroundColor(colors.black)
-term.setTextColor(colors.white)
-term.clear()
-term.setCursorPos(1, 1)
 if not ok then
-    print("Critical error: " .. tostring(err))
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.red)
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("LIFT CLIENT ERROR")
+    term.setCursorPos(1, 3)
+    print(tostring(err))
+    term.setCursorPos(1, 5)
+    print("Press any key to close")
+    os.pullEvent("key")
 else
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
+    term.clear()
+    term.setCursorPos(1, 1)
     print("Lift client stopped.")
 end
