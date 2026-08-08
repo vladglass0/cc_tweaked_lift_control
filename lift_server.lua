@@ -1,9 +1,9 @@
 -- CC:Tweaked lift server.
 -- Установите этот файл на компьютере рядом с лебедкой.
 local CONFIG = {
-    modemSide = "back",
+    modemSide = "top",
     liftSide = "bottom",
-    redstoneSide = "left",
+    redstoneSide = "back",
     channel = 4817,
     protocol = "lift_control_v1",
     callPulseSeconds = 0.2,
