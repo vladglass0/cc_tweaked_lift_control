@@ -9,12 +9,7 @@ local CONFIG = {
     refreshSeconds = 2,
 }
 
-local modem = peripheral.wrap(CONFIG.modemSide)
-if not modem or not modem.transmit then
-    error("Lift client: wireless modem unavailable on '" .. CONFIG.modemSide .. "'", 0)
-end
-modem.open(CONFIG.channel)
-
+local modem
 local state
 local selected = 1
 local timer
@@ -127,6 +122,13 @@ local function handleKey(key)
 end
 
 local ok, err = pcall(function()
+    modem = peripheral.find("modem", function(_, wrapped)
+        return wrapped and wrapped.transmit and wrapped.open
+    end)
+    if not modem then
+        error("Беспроводной модем не найден. Установите modem на компьютер.", 0)
+    end
+    modem.open(CONFIG.channel)
     draw()
     requestState()
     timer = os.startTimer(CONFIG.refreshSeconds)
