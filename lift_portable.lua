@@ -121,56 +121,45 @@ local function handleKey(key)
     end
 end
 
-local ok, err = pcall(function()
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.white)
-    term.clear()
-    term.setCursorPos(1, 1)
-    print("Lift client starting...")
+-- Диагностический запуск: сообщение должно появиться сразу после команды.
+print("LIFT CLIENT: starting")
 
-    modem = peripheral.find("modem")
-    if not modem or not modem.transmit or not modem.open then
-        error("Wireless modem not found. Attach a wireless modem to the computer.", 0)
-    end
-    modem.open(CONFIG.channel)
-    draw()
-    requestState()
-    timer = os.startTimer(CONFIG.refreshSeconds)
-    while running do
-        local event, a, b, c, d = os.pullEventRaw()
-        if event == "terminate" then
-            running = false
-        elseif event == "key" then
-            handleKey(a)
-        elseif event == "modem_message" and b == CONFIG.channel and type(d) == "string" then
-            local parsed, message = pcall(textutils.unserialize, d)
-            if parsed and type(message) == "table" and message.type == "state" then
-                state = message
-                if selected > #(state.floors or {}) then selected = math.max(1, #(state.floors or {})) end
-                draw()
-            end
-        elseif event == "timer" and a == timer then
-            requestState()
-            timer = os.startTimer(CONFIG.refreshSeconds)
-        end
-    end
-end)
-
-if not ok then
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.red)
-    term.clear()
-    term.setCursorPos(1, 1)
-    print("LIFT CLIENT ERROR")
-    term.setCursorPos(1, 3)
-    print(tostring(err))
-    term.setCursorPos(1, 5)
-    print("Press any key to close")
-    os.pullEventRaw("key")
-else
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.white)
-    term.clear()
-    term.setCursorPos(1, 1)
-    print("Lift client stopped.")
+modem = peripheral.find("modem")
+if not modem then
+    error("No modem found. Attach a wireless modem.", 0)
 end
+if not modem.open or not modem.transmit then
+    error("Found modem, but it is not wireless.", 0)
+end
+modem.open(CONFIG.channel)
+
+print("Modem OK, channel " .. CONFIG.channel)
+os.sleep(1)
+draw()
+requestState()
+timer = os.startTimer(CONFIG.refreshSeconds)
+
+while running do
+    local event, a, b, c, d = os.pullEventRaw()
+    if event == "terminate" then
+        running = false
+    elseif event == "key" then
+        handleKey(a)
+    elseif event == "modem_message" and b == CONFIG.channel and type(c) == "string" then
+        local parsed, message = pcall(textutils.unserialize, c)
+        if parsed and type(message) == "table" and message.type == "state" then
+            state = message
+            if selected > #(state.floors or {}) then
+                selected = math.max(1, #(state.floors or {}))
+            end
+            draw()
+        end
+    elseif event == "timer" and a == timer then
+        requestState()
+        timer = os.startTimer(CONFIG.refreshSeconds)
+    end
+end
+
+term.clear()
+term.setCursorPos(1, 1)
+print("Lift client stopped.")
