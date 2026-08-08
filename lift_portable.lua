@@ -137,8 +137,10 @@ local ok, err = pcall(function()
     requestState()
     timer = os.startTimer(CONFIG.refreshSeconds)
     while running do
-        local event, a, b, c, d = os.pullEvent()
-        if event == "key" then
+        local event, a, b, c, d = os.pullEventRaw()
+        if event == "terminate" then
+            running = false
+        elseif event == "key" then
             handleKey(a)
         elseif event == "modem_message" and b == CONFIG.channel and type(d) == "string" then
             local parsed, message = pcall(textutils.unserialize, d)
@@ -164,7 +166,7 @@ if not ok then
     print(tostring(err))
     term.setCursorPos(1, 5)
     print("Press any key to close")
-    os.pullEvent("key")
+    os.pullEventRaw("key")
 else
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.white)
