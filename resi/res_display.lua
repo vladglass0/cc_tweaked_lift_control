@@ -45,6 +45,15 @@ local function validMap(value)
     return true
 end
 
+local function validNames(value)
+    if type(value) ~= "table" then return true end
+    for key, name in pairs(value) do
+        if type(key) ~= "string" or #key == 0 or #key > 256 or
+            type(name) ~= "string" or #name == 0 or #name > 256 then return false end
+    end
+    return true
+end
+
 local function compact(value)
     value = tonumber(value) or 0
     local absolute = math.abs(value)
@@ -80,9 +89,9 @@ local function accept(raw)
     local id = tonumber(message.computerId)
     local name = message.source
     if not id or type(name) ~= "string" or #name == 0 or #name > 128 or
-        not validMap(message.items) or not validMap(message.fluids) then return end
+        not validMap(message.items) or not validNames(message.itemNames) or not validMap(message.fluids) then return end
     sources[id] = {
-        name = name, items = message.items, fluids = message.fluids,
+        name = name, items = message.items, itemNames = message.itemNames or {}, fluids = message.fluids,
         received = os.clock(), sentAt = message.sentAt,
     }
 end
@@ -101,6 +110,22 @@ local function totals()
         end
     end
     return items, fluids, active
+end
+
+local function itemLabel(id, source)
+    return (source and source.itemNames and source.itemNames[id]) or id
+end
+
+local function totalItemLabels()
+    local labels = {}
+    for _, source in pairs(sources) do
+        if fresh(source) then
+            for id, label in pairs(source.itemNames or {}) do
+                if not labels[id] then labels[id] = label end
+            end
+        end
+    end
+    return labels
 end
 
 local function sourceRows()
@@ -138,7 +163,8 @@ local function draw()
     local rows = {}
     if mode == "total" then
         local items, fluids = totals()
-        for _, entry in ipairs(sortedEntries(items)) do rows[#rows + 1] = { text = "I " .. entry.id .. "  " .. compact(entry.amount), color = colorset.item } end
+        local labels = totalItemLabels()
+        for _, entry in ipairs(sortedEntries(items)) do rows[#rows + 1] = { text = "I " .. (labels[entry.id] or entry.id) .. "  " .. compact(entry.amount), color = colorset.item } end
         for _, entry in ipairs(sortedEntries(fluids)) do rows[#rows + 1] = { text = "F " .. entry.id .. "  " .. compact(entry.amount), color = colorset.fluid } end
     else
         for _, entry in ipairs(sourceRows()) do
@@ -148,7 +174,7 @@ local function draw()
             for _ in pairs(source.fluids) do fluidCount = fluidCount + 1 end
             rows[#rows + 1] = { text = (entry.stale and "STALE " or "OK    ") .. sourceLabel(source, entry.id) ..
                 " I:" .. itemCount .. " F:" .. fluidCount, color = entry.stale and colorset.stale or colorset.item }
-            for _, value in ipairs(sortedEntries(source.items)) do rows[#rows + 1] = { text = "  I " .. value.id .. "  " .. compact(value.amount), color = colorset.item } end
+            for _, value in ipairs(sortedEntries(source.items)) do rows[#rows + 1] = { text = "  I " .. itemLabel(value.id, source) .. "  " .. compact(value.amount), color = colorset.item } end
             for _, value in ipairs(sortedEntries(source.fluids)) do rows[#rows + 1] = { text = "  F " .. value.id .. "  " .. compact(value.amount), color = colorset.fluid } end
         end
         if #rows == 0 then

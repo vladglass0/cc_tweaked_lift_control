@@ -26,12 +26,29 @@ local function addCount(target, key, amount)
     return true
 end
 
-local function readItems(device, items)
+local function readItems(device, items, itemNames)
     if type(device.list) ~= "function" then return false end
     local ok, contents = pcall(device.list)
     if not ok or type(contents) ~= "table" then return false end
-    for _, item in pairs(contents) do
-        if type(item) == "table" then addCount(items, item.name, item.count) end
+    for slot, item in pairs(contents) do
+        if type(item) == "table" then
+            addCount(items, item.name, item.count)
+            local displayName
+            if type(device.getItemDetail) == "function" then
+                local detailOk, detail = pcall(device.getItemDetail, slot)
+                if detailOk and type(detail) == "table" and type(detail.displayName) == "string" and
+                    #detail.displayName > 0 and #detail.displayName <= 256 then
+                    displayName = detail.displayName
+                end
+            end
+            if not displayName and type(item.displayName) == "string" and #item.displayName > 0 and
+                #item.displayName <= 256 then
+                displayName = item.displayName
+            end
+            if displayName then
+                itemNames[item.name] = displayName
+            end
+        end
     end
     return true
 end
@@ -66,19 +83,19 @@ local function readFluids(device, fluids)
 end
 
 local function collect()
-    local items, fluids = {}, {}
+    local items, fluids, itemNames = {}, {}, {}
     local inventoryCount, tankCount, unsupportedTanks = 0, 0, 0
     local seen = {}
     local namesOk, names = pcall(peripheral.getNames)
     if not namesOk or type(names) ~= "table" then
-        return items, fluids, inventoryCount, tankCount, 0
+        return items, fluids, itemNames, inventoryCount, tankCount, 0
     end
     for _, name in ipairs(names) do
         if name ~= CONFIG.modemSide then
             local ok, device = pcall(peripheral.wrap, name)
             if ok and device and not seen[device] then
                 seen[device] = true
-                if readItems(device, items) then inventoryCount = inventoryCount + 1 end
+                if readItems(device, items, itemNames) then inventoryCount = inventoryCount + 1 end
                 local supported = readFluids(device, fluids)
                 if supported then tankCount = tankCount + 1
                 elseif type(device.tanks) == "function" or type(device.getTanks) == "function" then
@@ -87,11 +104,11 @@ local function collect()
             end
         end
     end
-    return items, fluids, inventoryCount, tankCount, unsupportedTanks
+    return items, fluids, itemNames, inventoryCount, tankCount, unsupportedTanks
 end
 
 local function sendSnapshot()
-    local items, fluids, inventories, tanks, unsupported = collect()
+    local items, fluids, itemNames, inventories, tanks, unsupported = collect()
     local snapshot = {
         protocol = CONFIG.protocol,
         type = "snapshot",
@@ -99,6 +116,7 @@ local function sendSnapshot()
         computerId = os.getComputerID(),
         sentAt = os.clock(),
         items = items,
+        itemNames = itemNames,
         fluids = fluids,
     }
     local ok, message = pcall(textutils.serialize, snapshot)
